@@ -36,6 +36,8 @@ def prepare_gas_features(file_paths):
 
     features.append(prepare_cwv(file_paths["CWV"]))
 
+    features.append(prepare_gas_demand_diff(file_paths["GAS_DEMAND"]))
+
     features = pd.concat(features, axis=1)
 
     return features
@@ -111,3 +113,10 @@ def prepare_gas_demand_actuals(file_path):
     demand = demand.fillna(0).sort_index(ascending=True)
 
     return demand
+
+def prepare_gas_demand_diff(file_path):
+    demand = prepare_gas_demand_actuals(file_path)
+    
+    demand["LDZ_DEMAND_DIFF"] = demand["LDZ"] - demand["LDZ"].shift(2)
+
+    return demand[["LDZ_DEMAND_DIFF"]]

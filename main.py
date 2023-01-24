@@ -9,7 +9,8 @@ from src.evaluate import evaluate_models
 
 FORMAT = "%Y%m%d_%H%M%S"
 
-FEATURES = {"CWV": "data/cwv_data_20221118_214135.csv"}
+FEATURES = {"CWV": "data/cwv_data_20221118_214135.csv", 
+            "GAS_DEMAND": "data/gas_actuals_20221118_214136.csv"}
 ACTUALS = {"GAS": "data/gas_actuals_20221118_214136.csv"}
 
 gas_demand_actuals = prepare_gas_demand_actuals(ACTUALS["GAS"])

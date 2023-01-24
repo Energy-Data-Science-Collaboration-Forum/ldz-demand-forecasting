@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 from pandas.testing import assert_frame_equal, assert_series_equal
-from src.prepare_data import prepare_gas_demand_actuals, prepare_cwv
+
+import src.prepare_data
+from src.prepare_data import prepare_gas_demand_actuals, prepare_cwv, prepare_gas_demand_diff
 
 
 def test_prepare_gas_demand_actuals(monkeypatch):
@@ -80,3 +82,26 @@ def test_prepare_cwv(monkeypatch):
 
     assert_series_equal(result, desired_result)
 
+
+def test_prepare_gas_demand_diff(monkeypatch):
+
+    mock_data = pd.DataFrame(
+        {
+            "INDUSTRIAL": [1.0] * 4,
+            "INTERCONNECTOR": [1.0] * 4,
+            "LDZ": [1.0, 2, 4, 10],
+            "PS": [1.0] * 4,
+            "STORAGE": [1.0] * 4,
+        },
+        index=pd.DatetimeIndex(pd.date_range("2023-01-20", "2023-01-23"), name="GAS_DAY"),
+    )
+
+    def mock_prep(fp):
+        return mock_data
+
+    monkeypatch.setattr(src.prepare_data, "prepare_gas_demand_actuals", mock_prep)
+
+    result = prepare_gas_demand_diff(None)
+    desired_result = pd.DataFrame({"LDZ_DEMAND_DIFF":[np.NaN, np.NaN, 3, 8]}, 
+                        index=pd.DatetimeIndex(pd.date_range("2023-01-20", "2023-01-23"), name="GAS_DAY"),)
+    assert_frame_equal(result, desired_result)
