@@ -113,5 +113,17 @@ def train_ldz_diff(target, features):
     # putting the demand diff predictions back onto the same scale as the actual demand
     predictions['PREDICTION'] += y["LDZ"].shift(2)
 
-    return predictions['PREDICTION']
+    # train full model
+    model = Prophet(
+            changepoint_prior_scale=0.001,
+            seasonality_prior_scale=0.01,
+            yearly_seasonality=False,
+            daily_seasonality=False,
+    )
+    model.add_country_holidays(country_name="UK")
+    model.add_regressor("CWV_DIFF", mode="additive", prior_scale=0.01, standardize=False)
+    
+    model = model.fit(data_input)
+    
+    return model, predictions['PREDICTION']
 

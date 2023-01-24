@@ -89,7 +89,7 @@ def test_train_ldz_diff():
         ),
     )
 
-    result = train_ldz_diff(target, features)
+    _, result = train_ldz_diff(target, features)
 
     desired_result = pd.Series(
         [

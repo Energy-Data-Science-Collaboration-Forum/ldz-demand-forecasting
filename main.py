@@ -4,7 +4,7 @@ from src.prepare_data import (
     prepare_gas_demand_actuals,
     prepare_gas_features,
 )
-from src.train import train
+from src.train import train, train_ldz_diff
 from src.evaluate import evaluate_models
 
 FORMAT = "%Y%m%d_%H%M%S"
@@ -20,6 +20,8 @@ gas_features = prepare_gas_features(FEATURES)
 ldz_model, ldz_cv_predictions = train(gas_demand_actuals[["LDZ"]], gas_features)
 joblib.dump(ldz_model, f"data/ldz_model_{dt.now().strftime(format=FORMAT)}.joblib")
 
+ldz_diff_model, ldz_diff_cv_predictions = train_ldz_diff(gas_demand_actuals[["LDZ"]], gas_features)
+joblib.dump(ldz_diff_model, f"data/ldz_diff_model_{dt.now().strftime(format=FORMAT)}.joblib")
 
 model_performance = evaluate_models(
     ldz_cv_predictions, gas_demand_actuals
