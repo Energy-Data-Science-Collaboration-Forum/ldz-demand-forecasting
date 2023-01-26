@@ -1,10 +1,12 @@
+import warnings
 import datetime as dt
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import TimeSeriesSplit
-
 from prophet import Prophet
+
+from src.utils import suppress_stdout_stderr
 
 
 def train(target, features):
@@ -42,7 +44,9 @@ def tss_cross_val_predict(X, y, min_train=7):
     test_predictions = np.array(test_predictions).flatten()
     # samples from the first training iteration don't have any test predictions so should be discarded
     num_samples_train_first_iteration = X.shape[0] - test_predictions.shape[0]
-    test_predictions = pd.Series(test_predictions, index=X.index[num_samples_train_first_iteration:])
+    test_predictions = pd.Series(
+        test_predictions, index=X.index[num_samples_train_first_iteration:]
+    )
 
     return test_predictions
 
@@ -64,6 +68,8 @@ def train_ldz_diff(target, features):
     Returns:
         pandas Series: A series with predictions for the LDZ demand diff model
     """
+    # prophet and pandas don't like each other
+    warnings.simplefilter("ignore", FutureWarning)
 
     overlapping_dates = target.index.intersection(features.index)
     y = target.loc[overlapping_dates].copy()
@@ -79,9 +85,11 @@ def train_ldz_diff(target, features):
     # We've tried to align the method of model fitting to the method used for the Linear Regression
     # So this is meant to mimic a weekly retraining cycle
     # Each time the model is refitted on all historical data up to that point
-    for cutoff_date in pd.date_range(min_date, max_date, freq="7D", inclusive="neither"):
-        training_data = data_input[data_input['ds'] < cutoff_date]
-        
+    for cutoff_date in pd.date_range(
+        min_date, max_date, freq="7D", inclusive="neither"
+    ):
+        training_data = data_input[data_input["ds"] < cutoff_date]
+
         model = Prophet(
             changepoint_prior_scale=0.001,
             seasonality_prior_scale=0.01,
@@ -89,41 +97,52 @@ def train_ldz_diff(target, features):
             daily_seasonality=False,
         )
         model.add_country_holidays(country_name="UK")
-        model.add_regressor("CWV_DIFF", mode="additive", prior_scale=0.01, standardize=False)
-        
-        model = model.fit(training_data)
+        model.add_regressor(
+            "CWV_DIFF", mode="additive", prior_scale=0.01, standardize=False
+        )
+
+        with suppress_stdout_stderr():
+            model = model.fit(training_data)
 
         # this is where it gets tricky
         # we're sort of pretending these are day ahead forecasts
-        # previous exploration into this has shown that whether it's a daily or weekly horizon makes little difference 
+        # previous exploration into this has shown that whether it's a daily or weekly horizon makes little difference
         horizon = 7
         if (max_date - cutoff_date).days + 1 < horizon:
             horizon = (max_date - cutoff_date).days + 1
 
-        future_date = model.make_future_dataframe(periods=horizon, include_history=False)
-        mask = data_input['ds'].between(cutoff_date, cutoff_date + dt.timedelta(days=horizon-1))
-        future_date['CWV_DIFF'] = data_input.loc[mask, 'CWV_DIFF'].values
-        preds = model.predict(future_date)[['ds', 'yhat']]
+        future_date = model.make_future_dataframe(
+            periods=horizon, include_history=False
+        )
+        mask = data_input["ds"].between(
+            cutoff_date, cutoff_date + dt.timedelta(days=horizon - 1)
+        )
+        future_date["CWV_DIFF"] = data_input.loc[mask, "CWV_DIFF"].values
+        preds = model.predict(future_date)[["ds", "yhat"]]
         result.append(preds)
-    
-    predictions = (pd.concat(result).
-                    rename(columns={'yhat':'PREDICTION', 'ds':'GAS_DAY'}).
-                    set_index('GAS_DAY'))
+
+    predictions = (
+        pd.concat(result)
+        .rename(columns={"yhat": "PREDICTION", "ds": "GAS_DAY"})
+        .set_index("GAS_DAY")
+    )
 
     # putting the demand diff predictions back onto the same scale as the actual demand
-    predictions['PREDICTION'] += y["LDZ"].shift(2)
+    predictions["PREDICTION"] += y["LDZ"].shift(2)
 
     # train full model
     model = Prophet(
-            changepoint_prior_scale=0.001,
-            seasonality_prior_scale=0.01,
-            yearly_seasonality=False,
-            daily_seasonality=False,
+        changepoint_prior_scale=0.001,
+        seasonality_prior_scale=0.01,
+        yearly_seasonality=False,
+        daily_seasonality=False,
     )
     model.add_country_holidays(country_name="UK")
-    model.add_regressor("CWV_DIFF", mode="additive", prior_scale=0.01, standardize=False)
-    
-    model = model.fit(data_input)
-    
-    return model, predictions['PREDICTION']
+    model.add_regressor(
+        "CWV_DIFF", mode="additive", prior_scale=0.01, standardize=False
+    )
 
+    with suppress_stdout_stderr():
+        model = model.fit(data_input)
+
+    return model, predictions["PREDICTION"]
