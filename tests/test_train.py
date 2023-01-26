@@ -112,7 +112,7 @@ def test_train_ldz_diff():
         index=pd.DatetimeIndex(
             pd.date_range("2022-06-18", "2022-07-01"), name="GAS_DAY", freq=None
         ),
-        name="PREDICTION"
+        name="PROPHET_DIFF_DEMAND"
     )
 
     assert_series_equal(result, desired_result)

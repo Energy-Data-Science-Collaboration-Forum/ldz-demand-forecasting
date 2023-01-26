@@ -11,11 +11,14 @@ from src.utils import suppress_stdout_stderr
 
 def train(target, features):
 
-    overlapping_dates = target.index.intersection(features.index)
+    X = features.dropna()
+
+    overlapping_dates = target.index.intersection(X.index)
     y = target.loc[overlapping_dates].copy()
-    X = features.loc[overlapping_dates].copy()
+    X = X.loc[overlapping_dates].copy()
 
     predictions = tss_cross_val_predict(X, y)
+    predictions.name = "GLM_CWV"
     model = train_full_model(X, y)
 
     return model, predictions
@@ -71,13 +74,13 @@ def train_ldz_diff(target, features):
     # prophet and pandas don't like each other
     warnings.simplefilter("ignore", FutureWarning)
 
-    overlapping_dates = target.index.intersection(features.index)
+    data_input = features[["LDZ_DEMAND_DIFF", "CWV_DIFF"]].dropna()    
+
+    overlapping_dates = target.index.intersection(data_input.index)
     y = target.loc[overlapping_dates].copy()
-    X = features.loc[overlapping_dates].copy()
-
-    data_input = X[["LDZ_DEMAND_DIFF", "CWV_DIFF"]].reset_index().dropna()
+    data_input = data_input.loc[overlapping_dates].reset_index()
+   
     data_input.columns = ["ds", "y", "CWV_DIFF"]
-
     min_date = data_input["ds"].min()
     max_date = data_input["ds"].max()
 
@@ -123,12 +126,12 @@ def train_ldz_diff(target, features):
 
     predictions = (
         pd.concat(result)
-        .rename(columns={"yhat": "PREDICTION", "ds": "GAS_DAY"})
+        .rename(columns={"yhat": "PROPHET_DIFF_DEMAND", "ds": "GAS_DAY"})
         .set_index("GAS_DAY")
     )
 
     # putting the demand diff predictions back onto the same scale as the actual demand
-    predictions["PREDICTION"] += y["LDZ"].shift(2)
+    predictions["PROPHET_DIFF_DEMAND"] += y["LDZ"].shift(2)
 
     # train full model
     model = Prophet(
@@ -145,4 +148,4 @@ def train_ldz_diff(target, features):
     with suppress_stdout_stderr():
         model = model.fit(data_input)
 
-    return model, predictions["PREDICTION"]
+    return model, predictions["PROPHET_DIFF_DEMAND"]
