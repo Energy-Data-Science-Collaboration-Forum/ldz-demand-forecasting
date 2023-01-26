@@ -1,5 +1,6 @@
 import joblib
 from datetime import datetime as dt
+import pandas as pd
 from src.prepare_data import (
     prepare_gas_demand_actuals,
     prepare_gas_features,
@@ -23,8 +24,10 @@ joblib.dump(ldz_model, f"data/ldz_model_{dt.now().strftime(format=FORMAT)}.jobli
 ldz_diff_model, ldz_diff_cv_predictions = train_ldz_diff(gas_demand_actuals[["LDZ"]], gas_features)
 joblib.dump(ldz_diff_model, f"data/ldz_diff_model_{dt.now().strftime(format=FORMAT)}.joblib")
 
+all_predictions = pd.concat([ldz_cv_predictions, ldz_diff_cv_predictions], axis=1)
+
 model_performance = evaluate_models(
-    ldz_cv_predictions, gas_demand_actuals
+    all_predictions, gas_demand_actuals
 )
 model_performance.to_csv(
     f"data/model_performance_{dt.now().strftime(format=FORMAT)}.csv", index=False
