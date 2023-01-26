@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
-from pandas.testing import assert_frame_equal, assert_series_equal
-from src.prepare_data import prepare_gas_demand_actuals, prepare_cwv
+from pandas.testing import assert_frame_equal
+
+import src.prepare_data
+from src.prepare_data import prepare_gas_demand_actuals, prepare_cwv, prepare_gas_demand_diff, prepare_cwv_diff
 
 
 def test_prepare_gas_demand_actuals(monkeypatch):
@@ -72,11 +74,51 @@ def test_prepare_cwv(monkeypatch):
 
     result = prepare_cwv("")
 
-    desired_result = pd.Series(
-        [1.0],
-        name="CWV",
+    desired_result = pd.DataFrame(
+        {"CWV":[1.0]},
         index=pd.DatetimeIndex([pd.to_datetime("2022-01-10")], name="GAS_DAY"),
     )
 
-    assert_series_equal(result, desired_result)
+    assert_frame_equal(result, desired_result)
 
+
+def test_prepare_gas_demand_diff(monkeypatch):
+
+    mock_data = pd.DataFrame(
+        {
+            "INDUSTRIAL": [1.0] * 4,
+            "INTERCONNECTOR": [1.0] * 4,
+            "LDZ": [1.0, 2, 4, 10],
+            "PS": [1.0] * 4,
+            "STORAGE": [1.0] * 4,
+        },
+        index=pd.DatetimeIndex(pd.date_range("2023-01-20", "2023-01-23"), name="GAS_DAY"),
+    )
+
+    def mock_prep(fp):
+        return mock_data
+
+    monkeypatch.setattr(src.prepare_data, "prepare_gas_demand_actuals", mock_prep)
+
+    result = prepare_gas_demand_diff(None)
+    desired_result = pd.DataFrame({"LDZ_DEMAND_DIFF":[np.NaN, np.NaN, 3, 8]}, 
+                        index=pd.DatetimeIndex(pd.date_range("2023-01-20", "2023-01-23"), name="GAS_DAY"),)
+    assert_frame_equal(result, desired_result)
+
+
+def test_prepare_cwv_diff(monkeypatch):
+
+    mock_data = pd.DataFrame(
+        {"CWV":[1.0, 2, 4, 10]},
+        index=pd.DatetimeIndex(pd.date_range("2023-01-20", "2023-01-23"), name="GAS_DAY"),
+    )
+
+    def mock_prep(fp):
+        return mock_data
+
+    monkeypatch.setattr(src.prepare_data, "prepare_cwv", mock_prep)
+
+    result = prepare_cwv_diff(None)
+    desired_result = pd.DataFrame({"CWV_DIFF":[np.NaN, np.NaN, 3, 8]}, 
+                        index=pd.DatetimeIndex(pd.date_range("2023-01-20", "2023-01-23"), name="GAS_DAY"),)
+    assert_frame_equal(result, desired_result)
