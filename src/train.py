@@ -74,12 +74,12 @@ def train_ldz_diff(target, features):
     # prophet and pandas don't like each other
     warnings.simplefilter("ignore", FutureWarning)
 
-    data_input = features[["LDZ_DEMAND_DIFF", "CWV_DIFF"]].dropna()    
+    data_input = features[["LDZ_DEMAND_DIFF", "CWV_DIFF"]].dropna()
 
     overlapping_dates = target.index.intersection(data_input.index)
     y = target.loc[overlapping_dates].copy()
     data_input = data_input.loc[overlapping_dates].reset_index()
-   
+
     data_input.columns = ["ds", "y", "CWV_DIFF"]
     min_date = data_input["ds"].min()
     max_date = data_input["ds"].max()
@@ -149,3 +149,83 @@ def train_ldz_diff(target, features):
         model = model.fit(data_input)
 
     return model, predictions["PROPHET_DIFF_DEMAND"]
+
+
+def get_ldz_match_predictions(target, features):
+
+    data_input = pd.concat([target, features], axis=1).dropna()
+    data_input["CWV_rounded"] = np.round(data_input["CWV"], decimals=1)
+    data_input["MONTH"] = data_input.index.month
+    data_input["DAY"] = data_input.index.day
+
+    min_date = data_input.index.min() + dt.timedelta(days=23)
+    max_date = data_input.index.max()
+
+    result = []
+    # We've tried to align the method of model fitting to the method used for the Linear Regression
+    # So this is meant to mimic a weekly retraining cycle
+    # It may not make sense for this heuristic but it is more fair when comparing with the other methods
+    for cutoff_date in pd.date_range(
+        min_date, max_date, freq="7D", inclusive="neither"
+    ):
+        training_data = data_input[data_input.index < cutoff_date].copy()
+        test_data = data_input[
+            (data_input.index >= cutoff_date)
+            & (data_input.index < cutoff_date + dt.timedelta(days=7))
+        ].copy()
+
+        test_data = add_average_demand_by_cwv(test_data, training_data)
+        test_data = add_average_demand_by_month_day(test_data, training_data)
+
+        mask = (
+            (test_data["CHRISTMAS_DAY"])
+            | (test_data["NEW_YEARS_DAY"])
+            | (test_data["NEW_YEARS_EVE"])
+            | (test_data["BOXING_DAY"])
+        )
+        test_data["LDZ_MATCHED"] = np.where(
+            mask, test_data["AVERAGE_DEMAND_MONTH_DAY"], test_data["AVERAGE_DEMAND_CWV"]
+        )
+
+        # replace missing values with closest values
+        # for any records in the test set that couldn't be matched
+        # try to find the closest matching CWV_rounded value from the training set
+        # and use the LDZ value from the matching record as the forecast
+        for index, row in test_data.iterrows():
+            if pd.isna(row["LDZ_MATCHED"]):
+                closest_cwv_index = (
+                    (training_data["CWV_rounded"] - row["CWV_rounded"]).abs().idxmin()
+                )
+                test_data.at[index, "LDZ_MATCHED"] = training_data.loc[
+                    closest_cwv_index, "LDZ"
+                ].mean()
+
+        result.append(test_data[["LDZ_MATCHED"]])
+
+    predictions = pd.concat(result)
+    return predictions
+
+
+def add_average_demand_by_cwv(test_data, input_data):
+    aggregated_value = input_data.groupby(
+        [
+            "CWV_rounded",
+            "WORK_DAY",
+            "CHRISTMAS_DAY",
+            "NEW_YEARS_DAY",
+            "NEW_YEARS_EVE",
+            "BOXING_DAY",
+        ]
+    )["LDZ"].transform("mean")
+    result = test_data.join(
+        pd.DataFrame(aggregated_value, columns=["AVERAGE_DEMAND_CWV"])
+    )
+    return result
+
+
+def add_average_demand_by_month_day(test_data, input_data):
+    aggregated_value = input_data.groupby(["MONTH", "DAY"])["LDZ"].transform("mean")
+    result = test_data.join(
+        pd.DataFrame(aggregated_value, columns=["AVERAGE_DEMAND_MONTH_DAY"])
+    )
+    return result

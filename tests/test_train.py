@@ -1,7 +1,8 @@
+import numpy as np
 import pandas as pd
 from pandas.testing import assert_series_equal
 
-from src.train import train_ldz_diff
+from src.train import train_ldz_diff, get_ldz_match_predictions
 
 
 def test_train_ldz_diff():
@@ -93,26 +94,51 @@ def test_train_ldz_diff():
 
     desired_result = pd.Series(
         [
-                42.89517882,
-                38.87875191,
-                39.94676525,
-                42.65723483,
-                42.65128865,
-                41.09468538,
-                36.67572682,
-                51.63101586,
-                52.20381467,
-                46.16108121,
-                48.36261714,
-                56.28754182,
-                56.86735549,
-                61.06754255,
-            ]
-        ,
+            42.89517882,
+            38.87875191,
+            39.94676525,
+            42.65723483,
+            42.65128865,
+            41.09468538,
+            36.67572682,
+            51.63101586,
+            52.20381467,
+            46.16108121,
+            48.36261714,
+            56.28754182,
+            56.86735549,
+            61.06754255,
+        ],
         index=pd.DatetimeIndex(
             pd.date_range("2022-06-18", "2022-07-01"), name="GAS_DAY", freq=None
         ),
-        name="PROPHET_DIFF_DEMAND"
+        name="PROPHET_DIFF_DEMAND",
     )
 
     assert_series_equal(result, desired_result)
+
+
+def test_get_ldz_match_predictions():
+
+    dates = pd.date_range("2023-01-29", periods=40, freq="D")
+
+    mock_target = pd.DataFrame(
+        {
+            "LDZ": range(1, len(dates) + 1),
+        },
+        index=dates,
+    )
+
+    mock_features = pd.DataFrame(
+        {
+            "CWV": np.linspace(1, 10, num=len(dates)),
+            "WORK_DAY": [True] * len(dates),
+            "CHRISTMAS_DAY": [False] * len(dates),
+            "NEW_YEARS_DAY": [False] * len(dates),
+            "NEW_YEARS_EVE": [False] * len(dates),
+            "BOXING_DAY": [False] * len(dates),
+        },
+        index=dates,
+    )
+
+    result = get_ldz_match_predictions(mock_target, mock_features)
