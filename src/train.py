@@ -158,7 +158,11 @@ def get_ldz_match_predictions(target, features):
     data_input["MONTH"] = data_input.index.month
     data_input["DAY"] = data_input.index.day
 
-    min_date = data_input.index.min() + dt.timedelta(days=23)
+    # this is rather arbitrary but instead of throwing away loads
+    # of data we can let it give nonsense predictions for a while
+    # also this allows us to compare the performance over the same period
+    # as other models
+    min_date = data_input.index.min() + dt.timedelta(days=23) # 23 + 7 days from weekly retraining gives 30
     max_date = data_input.index.max()
 
     result = []
@@ -188,11 +192,9 @@ def get_ldz_match_predictions(target, features):
         )
 
         # replace missing values with closest values
-        # for any records in the test set that couldn't be matched
-        # try to find the closest matching CWV_rounded value from the training set
-        # and use the LDZ value from the matching record as the forecast
         for index, row in test_data.iterrows():
             if pd.isna(row["LDZ_MATCHED"]):
+                # try to find the closest matching CWV_rounded value from the training set
                 closest_cwv_index = (
                     (training_data["CWV_rounded"] - row["CWV_rounded"]).abs().idxmin()
                 )
@@ -221,6 +223,7 @@ def add_average_demand_by_cwv(test_data, input_data):
         .rename(columns={"LDZ": "AVERAGE_DEMAND_CWV"})
     )
     result = test_data.merge(aggregated_value, how="left")
+    result = result.set_index(test_data.index)
     return result
 
 
@@ -232,4 +235,5 @@ def add_average_demand_by_month_day(test_data, input_data):
         .rename(columns={"LDZ": "AVERAGE_DEMAND_MONTH_DAY"})
     )
     result = test_data.merge(aggregated_value, how="left")
+    result = result.set_index(test_data.index)
     return result
