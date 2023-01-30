@@ -207,25 +207,29 @@ def get_ldz_match_predictions(target, features):
 
 
 def add_average_demand_by_cwv(test_data, input_data):
-    aggregated_value = input_data.groupby(
-        [
+    aggregated_value = (
+        input_data.groupby([
             "CWV_rounded",
             "WORK_DAY",
             "CHRISTMAS_DAY",
             "NEW_YEARS_DAY",
             "NEW_YEARS_EVE",
             "BOXING_DAY",
-        ]
-    )["LDZ"].transform("mean")
-    result = test_data.join(
-        pd.DataFrame(aggregated_value, columns=["AVERAGE_DEMAND_CWV"])
+        ])["LDZ"]
+        .mean()
+        .reset_index()
+        .rename(columns={"LDZ": "AVERAGE_DEMAND_CWV"})
     )
+    result = test_data.merge(aggregated_value, how="left")
     return result
 
 
 def add_average_demand_by_month_day(test_data, input_data):
-    aggregated_value = input_data.groupby(["MONTH", "DAY"])["LDZ"].transform("mean")
-    result = test_data.join(
-        pd.DataFrame(aggregated_value, columns=["AVERAGE_DEMAND_MONTH_DAY"])
+    aggregated_value = (
+        input_data.groupby(["MONTH", "DAY"])["LDZ"]
+        .mean()
+        .reset_index()
+        .rename(columns={"LDZ": "AVERAGE_DEMAND_MONTH_DAY"})
     )
+    result = test_data.merge(aggregated_value, how="left")
     return result
