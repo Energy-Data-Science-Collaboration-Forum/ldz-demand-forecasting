@@ -9,6 +9,7 @@ from src.prepare_data import (
     prepare_gas_demand_diff,
     prepare_cwv_diff,
     add_workday,
+    add_christmas_bank_holiday
 )
 
 
@@ -152,4 +153,19 @@ def test_add_workday():
 
     desired_result["WORK_DAY"] = [1] * 5 + [0] * 2 + [1] * 3
 
+    assert_frame_equal(result, desired_result)
+
+def test_add_christmas_bank_holiday():
+    mock_data = pd.DataFrame(
+        {"One": [1] * 10}, index=pd.date_range("2022-12-24", periods=10, freq="D")
+    )
+
+    desired_result = mock_data.copy()
+    result = add_christmas_bank_holiday(mock_data)
+
+    desired_result["CHRISTMAS_DAY"] = [0, 1] + [0] * 8
+    desired_result["NEW_YEARS_DAY"] = [0] * 8 + [1, 0]
+    desired_result["NEW_YEARS_EVE"] = [0] * 7 + [1, 0, 0]
+    desired_result["BOXING_DAY"] = [0, 0, 1] + [0] * 7   
+        
     assert_frame_equal(result, desired_result)
