@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from pandas.testing import assert_series_equal, assert_frame_equal
 
+import src.train
 from src.train import (
     train_ldz_diff,
     get_ldz_match_predictions,
@@ -123,7 +124,7 @@ def test_train_ldz_diff():
     assert_series_equal(result, desired_result)
 
 
-def test_get_ldz_match_predictions():
+def test_get_ldz_match_predictions_basic():
 
     dates = pd.date_range("2023-01-29", periods=40, freq="D")
 
@@ -150,6 +151,58 @@ def test_get_ldz_match_predictions():
 
     desired_result = pd.DataFrame(
         {"LDZ_MATCHED": [30.0] * 7 + [37.0] * 3},
+        index=pd.date_range("2023-02-28", periods=10, freq="D"),
+    )
+
+    assert_frame_equal(result, desired_result)
+
+
+def test_get_ldz_match_predictions_with_averages(monkeypatch):
+
+    dates = pd.date_range("2023-01-29", periods=40, freq="D")
+
+    mock_target = pd.DataFrame(
+        {
+            "LDZ": range(1, len(dates) + 1),
+        },
+        index=dates,
+    )
+
+    mock_features = pd.DataFrame(
+        {
+            "CWV": np.linspace(1, 10, num=len(dates)),
+            "WORK_DAY": [True] * len(dates),
+            "CHRISTMAS_DAY": [False] * len(dates),
+            "NEW_YEARS_DAY": [False] * len(dates),
+            "NEW_YEARS_EVE": [False] * len(dates),
+            "BOXING_DAY": [False] * len(dates),
+        },
+        index=dates,
+    )
+
+    mock_features.iloc[-1, 2] = True
+    mock_features.iloc[-2, 3] = True
+    mock_features.iloc[-3, 4] = True
+    mock_features.iloc[-4, 5] = True
+
+    def mock_average_demand_cwv(testd, traind):
+        result = testd.copy()
+        result["AVERAGE_DEMAND_CWV"] = 1
+        return result
+
+    monkeypatch.setattr(src.train, "add_average_demand_by_cwv", mock_average_demand_cwv)
+
+    def mock_average_demand_md(testd, traind):
+        result = testd.copy()
+        result["AVERAGE_DEMAND_MONTH_DAY"] = 2
+        return result
+
+    monkeypatch.setattr(src.train, "add_average_demand_by_month_day", mock_average_demand_md)    
+
+    result = get_ldz_match_predictions(mock_target, mock_features)
+
+    desired_result = pd.DataFrame(
+        {"LDZ_MATCHED": [1] * 6 + [2] * 4},
         index=pd.date_range("2023-02-28", periods=10, freq="D"),
     )
 
