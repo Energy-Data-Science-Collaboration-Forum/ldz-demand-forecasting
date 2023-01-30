@@ -1,4 +1,5 @@
 import pandas as pd
+from workalendar.europe import UnitedKingdom
 
 # weights taken from doc/Gas_Demand_Forecasting_Methodology_Nov2016.pdf
 CWV_LDZ_WEIGHTS = pd.DataFrame(
@@ -37,12 +38,34 @@ def prepare_gas_features(file_paths):
     features.append(prepare_cwv(file_paths["CWV"]))
 
     features.append(prepare_gas_demand_diff(file_paths["GAS_DEMAND"]))
-    
+
     features.append(prepare_cwv_diff(file_paths["CWV"]))
 
     features = pd.concat(features, axis=1)
 
+    features = add_workday(features)
+
+    # features = add_christmas_bank_holiday(features)
+
     return features
+
+
+def add_workday(input_data):
+    """Adds a workday indicator to the given input data
+
+    Args:
+        input_data (pandas DataFrame): A DataFrame with dates on the index
+
+    Returns:
+        pandas DataFrame: A DataFrame with an additional WORK_DAY column of 0 (= non working day) and 1 (= working day) values
+    """
+
+    result = input_data.copy()
+
+    cal = UnitedKingdom()
+    result["WORK_DAY"] = result.index.to_series().apply(lambda x: 1 if cal.is_working_day(x) else 0)
+
+    return result
 
 
 def prepare_cwv(file_path):
@@ -116,9 +139,10 @@ def prepare_gas_demand_actuals(file_path):
 
     return demand
 
+
 def prepare_gas_demand_diff(file_path):
     demand = prepare_gas_demand_actuals(file_path)
-    
+
     demand["LDZ_DEMAND_DIFF"] = demand["LDZ"] - demand["LDZ"].shift(2)
 
     return demand[["LDZ_DEMAND_DIFF"]]
@@ -126,7 +150,7 @@ def prepare_gas_demand_diff(file_path):
 
 def prepare_cwv_diff(file_path):
     cwv = prepare_cwv(file_path)
-    
+
     cwv["CWV_DIFF"] = cwv["CWV"] - cwv["CWV"].shift(2)
 
     return cwv[["CWV_DIFF"]]
