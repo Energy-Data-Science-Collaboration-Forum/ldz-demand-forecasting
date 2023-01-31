@@ -74,12 +74,12 @@ def train_ldz_diff(target, features):
     # prophet and pandas don't like each other
     warnings.simplefilter("ignore", FutureWarning)
 
-    data_input = features[["LDZ_DEMAND_DIFF", "CWV_DIFF"]].dropna()    
+    data_input = features[["LDZ_DEMAND_DIFF", "CWV_DIFF"]].dropna()
 
     overlapping_dates = target.index.intersection(data_input.index)
     y = target.loc[overlapping_dates].copy()
     data_input = data_input.loc[overlapping_dates].reset_index()
-   
+
     data_input.columns = ["ds", "y", "CWV_DIFF"]
     min_date = data_input["ds"].min()
     max_date = data_input["ds"].max()
@@ -149,3 +149,91 @@ def train_ldz_diff(target, features):
         model = model.fit(data_input)
 
     return model, predictions["PROPHET_DIFF_DEMAND"]
+
+
+def get_ldz_match_predictions(target, features):
+
+    data_input = pd.concat([target, features], axis=1).dropna()
+    data_input["CWV_rounded"] = np.round(data_input["CWV"], decimals=1)
+    data_input["MONTH"] = data_input.index.month
+    data_input["DAY"] = data_input.index.day
+
+    # this is rather arbitrary but instead of throwing away loads
+    # of data we can let it give nonsense predictions for a while
+    # also this allows us to compare the performance over the same period
+    # as other models
+    min_date = data_input.index.min() + dt.timedelta(days=23) # 23 + 7 days from weekly retraining gives 30
+    max_date = data_input.index.max()
+
+    result = []
+    # We've tried to align the method of model fitting to the method used for the Linear Regression
+    # So this is meant to mimic a weekly retraining cycle
+    # It may not make sense for this heuristic but it is more fair when comparing with the other methods
+    for cutoff_date in pd.date_range(
+        min_date, max_date, freq="7D", inclusive="neither"
+    ):
+        training_data = data_input[data_input.index < cutoff_date].copy()
+        test_data = data_input[
+            (data_input.index >= cutoff_date)
+            & (data_input.index < cutoff_date + dt.timedelta(days=7))
+        ].copy()
+
+        test_data = add_average_demand_by_cwv(test_data, training_data)
+        test_data = add_average_demand_by_month_day(test_data, training_data)
+
+        mask = (
+            (test_data["CHRISTMAS_DAY"])
+            | (test_data["NEW_YEARS_DAY"])
+            | (test_data["NEW_YEARS_EVE"])
+            | (test_data["BOXING_DAY"])
+        )
+        test_data["LDZ_MATCHED"] = np.where(
+            mask, test_data["AVERAGE_DEMAND_MONTH_DAY"], test_data["AVERAGE_DEMAND_CWV"]
+        )
+
+        # replace missing values with closest values
+        for index, row in test_data.iterrows():
+            if pd.isna(row["LDZ_MATCHED"]):
+                # try to find the closest matching CWV_rounded value from the training set
+                closest_cwv_index = (
+                    (training_data["CWV_rounded"] - row["CWV_rounded"]).abs().idxmin()
+                )
+                test_data.at[index, "LDZ_MATCHED"] = training_data.loc[
+                    closest_cwv_index, "LDZ"
+                ].mean()
+
+        result.append(test_data[["LDZ_MATCHED"]])
+
+    predictions = pd.concat(result)
+    return predictions
+
+
+def add_average_demand_by_cwv(test_data, input_data):
+    aggregated_value = (
+        input_data.groupby([
+            "CWV_rounded",
+            "WORK_DAY",
+            "CHRISTMAS_DAY",
+            "NEW_YEARS_DAY",
+            "NEW_YEARS_EVE",
+            "BOXING_DAY",
+        ])["LDZ"]
+        .mean()
+        .reset_index()
+        .rename(columns={"LDZ": "AVERAGE_DEMAND_CWV"})
+    )
+    result = test_data.merge(aggregated_value, how="left")
+    result = result.set_index(test_data.index)
+    return result
+
+
+def add_average_demand_by_month_day(test_data, input_data):
+    aggregated_value = (
+        input_data.groupby(["MONTH", "DAY"])["LDZ"]
+        .mean()
+        .reset_index()
+        .rename(columns={"LDZ": "AVERAGE_DEMAND_MONTH_DAY"})
+    )
+    result = test_data.merge(aggregated_value, how="left")
+    result = result.set_index(test_data.index)
+    return result

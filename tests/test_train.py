@@ -1,7 +1,14 @@
+import numpy as np
 import pandas as pd
-from pandas.testing import assert_series_equal
+from pandas.testing import assert_series_equal, assert_frame_equal
 
-from src.train import train_ldz_diff
+import src.train
+from src.train import (
+    train_ldz_diff,
+    get_ldz_match_predictions,
+    add_average_demand_by_cwv,
+    add_average_demand_by_month_day,
+)
 
 
 def test_train_ldz_diff():
@@ -93,26 +100,161 @@ def test_train_ldz_diff():
 
     desired_result = pd.Series(
         [
-                42.89517882,
-                38.87875191,
-                39.94676525,
-                42.65723483,
-                42.65128865,
-                41.09468538,
-                36.67572682,
-                51.63101586,
-                52.20381467,
-                46.16108121,
-                48.36261714,
-                56.28754182,
-                56.86735549,
-                61.06754255,
-            ]
-        ,
+            42.89517882,
+            38.87875191,
+            39.94676525,
+            42.65723483,
+            42.65128865,
+            41.09468538,
+            36.67572682,
+            51.63101586,
+            52.20381467,
+            46.16108121,
+            48.36261714,
+            56.28754182,
+            56.86735549,
+            61.06754255,
+        ],
         index=pd.DatetimeIndex(
             pd.date_range("2022-06-18", "2022-07-01"), name="GAS_DAY", freq=None
         ),
-        name="PROPHET_DIFF_DEMAND"
+        name="PROPHET_DIFF_DEMAND",
     )
 
     assert_series_equal(result, desired_result)
+
+
+def test_get_ldz_match_predictions_basic():
+
+    dates = pd.date_range("2023-01-29", periods=40, freq="D")
+
+    mock_target = pd.DataFrame(
+        {
+            "LDZ": range(1, len(dates) + 1),
+        },
+        index=dates,
+    )
+
+    mock_features = pd.DataFrame(
+        {
+            "CWV": np.linspace(1, 10, num=len(dates)),
+            "WORK_DAY": [True] * len(dates),
+            "CHRISTMAS_DAY": [False] * len(dates),
+            "NEW_YEARS_DAY": [False] * len(dates),
+            "NEW_YEARS_EVE": [False] * len(dates),
+            "BOXING_DAY": [False] * len(dates),
+        },
+        index=dates,
+    )
+
+    result = get_ldz_match_predictions(mock_target, mock_features)
+
+    desired_result = pd.DataFrame(
+        {"LDZ_MATCHED": [30.0] * 7 + [37.0] * 3},
+        index=pd.date_range("2023-02-28", periods=10, freq="D"),
+    )
+
+    assert_frame_equal(result, desired_result)
+
+
+def test_get_ldz_match_predictions_with_averages(monkeypatch):
+
+    dates = pd.date_range("2023-01-29", periods=40, freq="D")
+
+    mock_target = pd.DataFrame(
+        {
+            "LDZ": range(1, len(dates) + 1),
+        },
+        index=dates,
+    )
+
+    mock_features = pd.DataFrame(
+        {
+            "CWV": np.linspace(1, 10, num=len(dates)),
+            "WORK_DAY": [True] * len(dates),
+            "CHRISTMAS_DAY": [False] * len(dates),
+            "NEW_YEARS_DAY": [False] * len(dates),
+            "NEW_YEARS_EVE": [False] * len(dates),
+            "BOXING_DAY": [False] * len(dates),
+        },
+        index=dates,
+    )
+
+    mock_features.iloc[-1, 2] = True
+    mock_features.iloc[-2, 3] = True
+    mock_features.iloc[-3, 4] = True
+    mock_features.iloc[-4, 5] = True
+
+    def mock_average_demand_cwv(testd, traind):
+        result = testd.copy()
+        result["AVERAGE_DEMAND_CWV"] = 1
+        return result
+
+    monkeypatch.setattr(src.train, "add_average_demand_by_cwv", mock_average_demand_cwv)
+
+    def mock_average_demand_md(testd, traind):
+        result = testd.copy()
+        result["AVERAGE_DEMAND_MONTH_DAY"] = 2
+        return result
+
+    monkeypatch.setattr(src.train, "add_average_demand_by_month_day", mock_average_demand_md)    
+
+    result = get_ldz_match_predictions(mock_target, mock_features)
+
+    desired_result = pd.DataFrame(
+        {"LDZ_MATCHED": [1] * 6 + [2] * 4},
+        index=pd.date_range("2023-02-28", periods=10, freq="D"),
+    )
+
+    assert_frame_equal(result, desired_result)
+
+
+def test_add_average_demand_by_month_day():
+    mock_data = pd.DataFrame(
+        {"MONTH": [1] * 3 + [2] * 4, "DAY": [2] * 3 + [4] * 4, "LDZ": range(1, 8)}
+    )
+
+    mock_test_data = pd.DataFrame(
+        {"MONTH": [1, 1, 2], "DAY": [2, 3, 4]}, index=[3, 2, 1]
+    )
+
+    desired_result = mock_test_data.copy()
+
+    result = add_average_demand_by_month_day(mock_test_data, mock_data)
+
+    desired_result["AVERAGE_DEMAND_MONTH_DAY"] = [2, np.NaN, 5.5]
+
+    assert_frame_equal(result, desired_result)
+
+
+def test_add_average_demand_by_cwv():
+    mock_data = pd.DataFrame(
+        {
+            "CWV_rounded": [1.2, 1.2, 1.4, 1.4, 1.5, 1.5, 1.6, 1.6, 1.8, 1.8],
+            "WORK_DAY": [True] * 2 + [False] * 8,
+            "CHRISTMAS_DAY": [False] * 2 + [True] * 2 + [False] * 6,
+            "NEW_YEARS_DAY": [False] * 4 + [True] * 2 + [False] * 4,
+            "NEW_YEARS_EVE": [False] * 6 + [True] * 2 + [False] * 2,
+            "BOXING_DAY": [False] * 8 + [True] * 2,
+            "LDZ": range(1, 11),
+        }
+    )
+
+    mock_test_data = pd.DataFrame(
+        {
+            "CWV_rounded": [1.2, 1.4, 1.5, 1.6, 1.8, 2.0],
+            "WORK_DAY": [True] + [False] * 5,
+            "CHRISTMAS_DAY": [False] + [True] + [False] * 4,
+            "NEW_YEARS_DAY": [False] * 2 + [True] + [False] * 3,
+            "NEW_YEARS_EVE": [False] * 3 + [True] + [False] * 2,
+            "BOXING_DAY": [False] * 4 + [True] + [False],
+        },
+        index=[6, 5, 4, 3, 2, 1],
+    )
+
+    desired_result = mock_test_data.copy()
+
+    result = add_average_demand_by_cwv(mock_test_data, mock_data)
+
+    desired_result["AVERAGE_DEMAND_CWV"] = [1.5, 3.5, 5.5, 7.5, 9.5, np.NaN]
+    assert_frame_equal(result, desired_result)

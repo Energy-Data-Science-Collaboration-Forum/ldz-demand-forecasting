@@ -1,4 +1,5 @@
 import pandas as pd
+from workalendar.europe import UnitedKingdom
 
 # weights taken from doc/Gas_Demand_Forecasting_Methodology_Nov2016.pdf
 CWV_LDZ_WEIGHTS = pd.DataFrame(
@@ -37,12 +38,61 @@ def prepare_gas_features(file_paths):
     features.append(prepare_cwv(file_paths["CWV"]))
 
     features.append(prepare_gas_demand_diff(file_paths["GAS_DEMAND"]))
-    
+
     features.append(prepare_cwv_diff(file_paths["CWV"]))
 
     features = pd.concat(features, axis=1)
 
+    features = add_workday(features)
+
+    features = add_christmas_bank_holiday(features)
+
     return features
+
+
+def add_christmas_bank_holiday(input_data):
+    """Adds 4 indicator columns for the bank holidays around Christmas
+
+    Args:
+        input_data (pandas DataFrame): A DataFrame with dates on the index
+
+    Returns:
+        pandas DataFrame: A DataFrame with an additional CHRISTMAS_DAY, NEW_YEARS_DAY, NEW_YEARS_EVE 
+        and BOXING_DAY column. Values are 0 (= no bank holiday) and 1 (= bank holiday) values
+    """
+    result = input_data.copy()
+
+    result["M"] = result.index.month
+    result["D"] = result.index.day
+    result["CHRISTMAS_DAY"] = result["NEW_YEARS_DAY"] = result["NEW_YEARS_EVE"] = result[
+        "BOXING_DAY"
+    ] = 0
+    result.loc[(result["M"] == 12) & (result["D"] == 25), "CHRISTMAS_DAY"] = 1
+    result.loc[(result["M"] == 1) & (result["D"] == 1), "NEW_YEARS_DAY"] = 1
+    result.loc[(result["M"] == 12) & (result["D"] == 31), "NEW_YEARS_EVE"] = 1
+    result.loc[(result["M"] == 12) & (result["D"] == 26), "BOXING_DAY"] = 1
+
+    result = result.drop(columns=["M", "D"])
+    
+    return result
+
+
+def add_workday(input_data):
+    """Adds a workday indicator to the given input data
+
+    Args:
+        input_data (pandas DataFrame): A DataFrame with dates on the index
+
+    Returns:
+        pandas DataFrame: A DataFrame with an additional WORK_DAY column of 0 (= non working day) and 1 (= working day) values
+    """
+
+    result = input_data.copy()
+
+    cal = UnitedKingdom()
+    result["WORK_DAY"] = result.index.to_series().apply(lambda x: 1 if cal.is_working_day(x) else 0)
+
+    return result
 
 
 def prepare_cwv(file_path):
@@ -116,9 +166,10 @@ def prepare_gas_demand_actuals(file_path):
 
     return demand
 
+
 def prepare_gas_demand_diff(file_path):
     demand = prepare_gas_demand_actuals(file_path)
-    
+
     demand["LDZ_DEMAND_DIFF"] = demand["LDZ"] - demand["LDZ"].shift(2)
 
     return demand[["LDZ_DEMAND_DIFF"]]
@@ -126,7 +177,7 @@ def prepare_gas_demand_diff(file_path):
 
 def prepare_cwv_diff(file_path):
     cwv = prepare_cwv(file_path)
-    
+
     cwv["CWV_DIFF"] = cwv["CWV"] - cwv["CWV"].shift(2)
 
     return cwv[["CWV_DIFF"]]
