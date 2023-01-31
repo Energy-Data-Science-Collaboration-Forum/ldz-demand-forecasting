@@ -129,5 +129,5 @@ def get_mipi_data(item_names, from_date, to_date):
 
 if __name__ == "__main__":
     data_dir = "data"
-    get_cwv_from_mipi(data_dir, "2022-01-01", "2022-07-01")
-    get_gas_actuals_from_mipi(data_dir, "2022-01-01", "2022-07-01")
+    get_cwv_from_mipi(data_dir, "2019-01-01", "2022-11-01")
+    get_gas_actuals_from_mipi(data_dir, "2019-01-01", "2022-11-01")
