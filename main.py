@@ -11,11 +11,11 @@ from src.evaluate import evaluate_models
 FORMAT = "%Y%m%d_%H%M%S"
 
 FEATURES = {
-    "CWV": "data/cwv_data_20221118_214135.csv",
-    "GAS_DEMAND": "data/gas_actuals_20221118_214136.csv",
+    "CWV": "data/cwv_data_sample.csv",
+    "GAS_DEMAND": "data/gas_actuals_sample.csv",
 }
 
-ldz_demand_actuals = prepare_gas_demand_actuals("data/gas_actuals_20221118_214136.csv")
+ldz_demand_actuals = prepare_gas_demand_actuals("data/gas_actuals_sample.csv")
 ldz_demand_actuals = ldz_demand_actuals[["LDZ"]]
 
 gas_features = prepare_gas_features(FEATURES)
