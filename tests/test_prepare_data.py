@@ -9,7 +9,8 @@ from src.prepare_data import (
     prepare_gas_demand_diff,
     prepare_cwv_diff,
     add_workday,
-    add_christmas_bank_holiday
+    add_christmas_bank_holiday,
+    add_weekend_indicator
 )
 
 
@@ -169,3 +170,17 @@ def test_add_christmas_bank_holiday():
     desired_result["BOXING_DAY"] = [0, 0, 1] + [0] * 7   
         
     assert_frame_equal(result, desired_result)
+
+
+def test_add_weekend_indicator():
+    mock_data = pd.DataFrame(
+        {"One": range(7)}, index=pd.date_range("2022-03-21", "2022-03-27")
+    )
+
+    result = add_weekend_indicator(mock_data)
+    desired_result = pd.DataFrame(
+        {"One": range(7), "WEEKEND": [0, 0, 0, 0, 0, 1, 1]},
+        index=pd.date_range("2022-03-21", "2022-03-27"),
+    )
+
+    assert_frame_equal(result, desired_result, check_dtype=False)
