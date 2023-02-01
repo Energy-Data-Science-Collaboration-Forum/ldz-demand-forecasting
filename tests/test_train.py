@@ -8,7 +8,92 @@ from src.train import (
     get_ldz_match_predictions,
     add_average_demand_by_cwv,
     add_average_demand_by_month_day,
+    train_glm,
 )
+
+
+def test_train_glm():
+    target = pd.DataFrame(
+        {
+            "LDZ": [
+                52.16314,
+                53.94938,
+                61.38836,
+                59.02986,
+                53.926,
+                49.71774,
+                47.03101,
+                49.43077,
+                53.47305,
+                54.79746,
+                54.57056,
+                51.4812,
+                51.66534,
+                52.27608,
+                46.27135,
+                48.5113,
+                56.47527,
+                57.09211,
+                61.32952,
+                63.85277,
+                58.93696,
+            ]
+        },
+        index=pd.DatetimeIndex(
+            pd.date_range("2022-06-11", "2022-07-01"), name="GAS_DAY"
+        ),
+    )
+    features = pd.DataFrame(
+        {
+            "CWV": [
+                9.01,
+                3.91,
+                6.54,
+                6.0,
+                15.09,
+                4.73,
+                8.65,
+                5.96,
+                11.03,
+                3.14,
+                12.26,
+                7.03,
+                11.62,
+                6.24,
+                7.13,
+                4.16,
+                9.14,
+                9.35,
+                4.16,
+                9.14,
+                9.35,
+            ],
+        },
+        index=pd.DatetimeIndex(
+            pd.date_range("2022-06-11", "2022-07-01"), name="GAS_DAY"
+        ),
+    )
+
+    _, result = train_glm(target, features)
+    desired_result = pd.Series(
+        [
+            53.63526375,
+            53.37458276,
+            53.68013042,
+            53.62958443,
+            53.79826036,
+            52.55993352,
+            52.57122378,
+            52.29219321,
+            52.55993352,
+            52.57122378,
+        ],
+        index=pd.DatetimeIndex(
+            pd.date_range("2022-06-22", "2022-07-01"), name="GAS_DAY"
+        ),
+        name="GLM_CWV",
+    )
+    assert_series_equal(result, desired_result)
 
 
 def test_train_ldz_diff():
@@ -197,7 +282,9 @@ def test_get_ldz_match_predictions_with_averages(monkeypatch):
         result["AVERAGE_DEMAND_MONTH_DAY"] = 2
         return result
 
-    monkeypatch.setattr(src.train, "add_average_demand_by_month_day", mock_average_demand_md)    
+    monkeypatch.setattr(
+        src.train, "add_average_demand_by_month_day", mock_average_demand_md
+    )
 
     result = get_ldz_match_predictions(mock_target, mock_features)
 
