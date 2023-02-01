@@ -1,7 +1,7 @@
 # Gas Demand Forecasting
-[National Grid Gas Transmission (GT)](https://www.nationalgrid.com/gas-transmission/) own, manage, and operate the national transmission network in Great Britain, making gas available when and where it’s needed. We do not produce or sell gas ourselved but instead are required by law to develop, maintain, and operate economic and efficient networks and to facilitate competition in the supply of gas. 
+[National Gas Transmission (GT)](https://www.nationalgas.com/) own, manage, and operate the national transmission network in Great Britain, making gas available when and where it’s needed. We do not produce or sell gas ourselved but instead are required by law to develop, maintain, and operate economic and efficient networks and to facilitate competition in the supply of gas. 
 
-As part of our role as operator of the network we are [incentivised](https://www.nationalgrid.com/gas-transmission/about-us/system-operator-incentives/demand-forecasting) to publish gas demand forecasts over a range of timescales. This is to assist the industry to make efficient decisions in balancing their supply and demand positions. It is therefore important for these values to be as accurate as possible. 
+As part of our role as operator of the network we are [incentivised](https://www.nationalgas.com/about-us/system-operator-incentives/demand-forecasting) to publish gas demand forecasts over a range of timescales. This is to assist the industry to make efficient decisions in balancing their supply and demand positions. It is therefore important for these values to be as accurate as possible. 
 
 We are now making the work we have done to improve the forecasts publicly available through this repository. **This is only for the purpose of collaboration and is not a representation of how the published forecast is created.** This is also a work in progress, it may at times not be complete or fail to work but just drop us a message or [create an issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/creating-an-issue) and we'll try to resolve it.
 
@@ -29,9 +29,11 @@ The last run with the full datasets was on 31st January 2023 with the following 
 
 |Model|MAE|MAPE|
 ---|---|---|
-|GLM_CWV|6.388355|0.069234|
-|LDZ_MATCHED|8.576018|0.083839|
-|PROPHET_DIFF_DEMAND|8.003642|0.064988|
+|GLM_CWV|7.831699|0.080014|
+|LDZ_MATCHED|8.715029|0.084478|
+|PROPHET_DIFF_DEMAND|8.125445|0.065073|
+|LDZ_STACK|6.471591|0.054500|
+
 
 ## Contributing
 
