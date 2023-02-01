@@ -1,36 +1,58 @@
 import warnings
+import logging
 import datetime as dt
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, TheilSenRegressor
 from sklearn.model_selection import TimeSeriesSplit
 from prophet import Prophet
 
 from src.utils import suppress_stdout_stderr
 
+logger = logging.getLogger(__name__)
+
 
 def train(target, features):
+    """Train a Linear Regression model based on CWV
 
-    X = features.dropna()
+    Args:
+        target (pandas DataFrame): A DataFrame with a column named LDZ for the gas demand actuals
+        features (pandas DataFrame): A DataFrame with a column named CWV for the CWV forecast
 
-    overlapping_dates = target.index.intersection(X.index)
-    y = target.loc[overlapping_dates].copy()
-    X = X.loc[overlapping_dates].copy()
+    Returns:
+        pandas Series: A Series with the predictions from the linear model, named GLM_CWV
+    """
+    logger.info("Training linear model with CWV feature")
+    X = features[["CWV"]].dropna()
 
-    predictions = tss_cross_val_predict(X, y)
+    X, y = check_overlapping_dates(target, X)
+
+    model = LinearRegression()
+
+    predictions = tss_cross_val_predict(X, y, model)
     predictions.name = "GLM_CWV"
     model = train_full_model(X, y)
 
     return model, predictions
 
 
-def tss_cross_val_predict(X, y, min_train=7):
+def tss_cross_val_predict(X, y, model, min_train=7):
+    """Apply a form of Time Series cross validation with the given data and for the given model
+    We expand the data by a week in each fold and retrain the model to generate predictions for the next week.
 
+    Args:
+        X (pandas DataFrame): A DataFrame with features
+        y (pandas DataFrame): A DataFrame with the target
+        model (a sklearn Model): A model object with a fit and predict function
+        min_train (int, optional): Number of historical values necessary to start the training cadence. Defaults to 7.
+
+    Returns:
+        pandas Series: A Series with the predictions from all the folds
+    """
     test_predictions = []
     # weekly window
     nsplits = abs(round((X.index.min() - X.index.max()).days / 7))
     tscv = TimeSeriesSplit(n_splits=nsplits)
-    model = LinearRegression()
 
     for train_index, test_index in tscv.split(X):
 
@@ -71,6 +93,10 @@ def train_ldz_diff(target, features):
     Returns:
         pandas Series: A series with predictions for the LDZ demand diff model
     """
+    logger.info(
+        "Training prophet model with CWV_DIFF as feature and DEMAND_DIFF as target"
+    )
+
     # prophet and pandas don't like each other
     warnings.simplefilter("ignore", FutureWarning)
 
@@ -152,6 +178,17 @@ def train_ldz_diff(target, features):
 
 
 def get_ldz_match_predictions(target, features):
+    """Calculate the predictions according to a match heuristic.
+    We match the CWV forecast to a historical CWV. However for the christmas bank holidays we take the historical average from the same period.
+
+    Args:
+        target (pandas DataFrame): A DataFrame with a column named LDZ for the gas demand actuals
+        features (pandas DataFrame): A DataFrame with a columns for the CWV forecast and indicator columns for the bank holidays and work days
+
+    Returns:
+        pandas DataFrame: A DataFrame with the predictions in a column named LDZ_MATCHED
+    """
+    logger.info("Calculating LDZ MATCH predictions")
 
     data_input = pd.concat([target, features], axis=1).dropna()
     data_input["CWV_rounded"] = np.round(data_input["CWV"], decimals=1)
@@ -162,7 +199,9 @@ def get_ldz_match_predictions(target, features):
     # of data we can let it give nonsense predictions for a while
     # also this allows us to compare the performance over the same period
     # as other models
-    min_date = data_input.index.min() + dt.timedelta(days=23) # 23 + 7 days from weekly retraining gives 30
+    min_date = data_input.index.min() + dt.timedelta(
+        days=23
+    )  # 23 + 7 days from weekly retraining gives 30
     max_date = data_input.index.max()
 
     result = []
@@ -209,15 +248,26 @@ def get_ldz_match_predictions(target, features):
 
 
 def add_average_demand_by_cwv(test_data, input_data):
+    """Calculate the average demand by CWV and a few other variables from the given input_data and add it to the given test_data
+
+    Args:
+        test_data (pandas DataFrame): A DataFrame with columns for the CWV forecast and indicator columns for the bank holidays and workdays
+        input_data (pandas DataFrame): A DataFrame with columns for the CWV forecast and indicator columns for the bank holidays and workdays
+
+    Returns:
+        pandas DataFrame: The given test_data but with an additional AVERAGE_DEMAND_CWV column
+    """
     aggregated_value = (
-        input_data.groupby([
-            "CWV_rounded",
-            "WORK_DAY",
-            "CHRISTMAS_DAY",
-            "NEW_YEARS_DAY",
-            "NEW_YEARS_EVE",
-            "BOXING_DAY",
-        ])["LDZ"]
+        input_data.groupby(
+            [
+                "CWV_rounded",
+                "WORK_DAY",
+                "CHRISTMAS_DAY",
+                "NEW_YEARS_DAY",
+                "NEW_YEARS_EVE",
+                "BOXING_DAY",
+            ]
+        )["LDZ"]
         .mean()
         .reset_index()
         .rename(columns={"LDZ": "AVERAGE_DEMAND_CWV"})
@@ -228,6 +278,15 @@ def add_average_demand_by_cwv(test_data, input_data):
 
 
 def add_average_demand_by_month_day(test_data, input_data):
+    """Calculate the average demand by month and day from the given input_data and add it to the given test_data
+
+    Args:
+        test_data (pandas DataFrame): A DataFrame with columns for month and day
+        input_data (pandas DataFrame): A DataFrame with columns for month and day
+
+    Returns:
+        pandas DataFrame: The given test_data but with an additional AVERAGE_DEMAND_MONTH_DAY column
+    """
     aggregated_value = (
         input_data.groupby(["MONTH", "DAY"])["LDZ"]
         .mean()
@@ -237,3 +296,53 @@ def add_average_demand_by_month_day(test_data, input_data):
     result = test_data.merge(aggregated_value, how="left")
     result = result.set_index(test_data.index)
     return result
+
+
+def train_ldz_stack_model(target, demand_diff_predictions, match_predictions):
+    """Train a stacked TheilSenRegression model based on the predictions from the LDZ Match and Prophet models
+
+    Args:
+        target (pandas DataFrame): A DataFrame with a column named LDZ for the gas demand actuals
+        demand_diff_predictions (pandas DataFrame): A DataFrame with predictions from the Prophet model in a column named PROPHET_DIFF_DEMAND
+        match_predictions (pandas DataFrame): A DataFrame with predictions from the LDZ Match model in a column named LDZ_MATCHED
+
+    Returns:
+        pandas Series: A Series with the predictions, named LDZ_STACK
+    """
+    logger.info(
+        "Training stacked TheilSenRegression model with LDZ MATCH and PROPHET_DIFF_DEMAND as features"
+    )
+    features = pd.concat([demand_diff_predictions, match_predictions], axis=1)
+
+    features["frcst_diff_2"] = (
+        features["PROPHET_DIFF_DEMAND"] - features["LDZ_MATCHED"]
+    ).pow(2)
+    features = features.dropna()
+
+    X, y = check_overlapping_dates(target, features)
+
+    model = TheilSenRegressor(fit_intercept=False, random_state=20230131)
+
+    predictions = tss_cross_val_predict(X, y["LDZ"], model)
+    predictions.name = "LDZ_STACK"
+
+    model = TheilSenRegressor(fit_intercept=False, random_state=20230131).fit(X, y["LDZ"])
+
+    return model, predictions
+
+
+def check_overlapping_dates(dataset_one, dataset_two):
+    """Determine the overlapping dates from the given datasets and filter them both by it
+
+    Args:
+        dataset_one (pandas DataFrame): A DataFrame with dates on the index
+        dataset_two (pandas DataFrame): A DataFrame with dates on the index
+
+    Returns:
+        tuple: A tuple of DataFrame, in reverse order from the input (just to confuse you)
+    """
+    overlapping_dates = dataset_one.index.intersection(dataset_two.index)
+    d1 = dataset_one.loc[overlapping_dates].copy()
+    d2 = dataset_two.loc[overlapping_dates].copy()
+
+    return d2, d1
