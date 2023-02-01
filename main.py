@@ -7,7 +7,7 @@ from src.prepare_data import (
     prepare_gas_features,
 )
 from src.train import (
-    train,
+    train_glm,
     train_ldz_diff,
     get_ldz_match_predictions,
     train_ldz_stack_model,
@@ -31,7 +31,7 @@ ldz_demand_actuals = ldz_demand_actuals[["LDZ"]]
 logger.info("Prepraring features")
 gas_features = prepare_gas_features(FEATURES)
 
-ldz_model, ldz_cv_predictions = train(ldz_demand_actuals, gas_features)
+ldz_model, ldz_cv_predictions = train_glm(ldz_demand_actuals, gas_features)
 joblib.dump(ldz_model, f"data/ldz_model_{dt.now().strftime(format=FORMAT)}.joblib")
 
 ldz_diff_model, ldz_diff_cv_predictions = train_ldz_diff(

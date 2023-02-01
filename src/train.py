@@ -12,7 +12,7 @@ from src.utils import suppress_stdout_stderr
 logger = logging.getLogger(__name__)
 
 
-def train(target, features):
+def train_glm(target, features):
     """Train a Linear Regression model based on CWV
 
     Args:
@@ -326,7 +326,9 @@ def train_ldz_stack_model(target, demand_diff_predictions, match_predictions):
     predictions = tss_cross_val_predict(X, y["LDZ"], model)
     predictions.name = "LDZ_STACK"
 
-    model = TheilSenRegressor(fit_intercept=False, random_state=20230131).fit(X, y["LDZ"])
+    model = TheilSenRegressor(fit_intercept=False, random_state=20230131).fit(
+        X, y["LDZ"]
+    )
 
     return model, predictions
 
