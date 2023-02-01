@@ -31,8 +31,10 @@ def train_glm(target, features):
 
     predictions = tss_cross_val_predict(X, y, model)
     predictions.name = "GLM_CWV"
-    model = train_full_model(X, y)
 
+    model = LinearRegression()
+    model.fit(X, y)
+    
     return model, predictions
 
 
@@ -74,13 +76,6 @@ def tss_cross_val_predict(X, y, model, min_train=7):
     )
 
     return test_predictions
-
-
-def train_full_model(X, y):
-    model = LinearRegression()
-    model.fit(X, y)
-
-    return model
 
 
 def train_ldz_diff(target, features):
