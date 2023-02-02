@@ -33,6 +33,7 @@ The last run with the full datasets was on 31st January 2023 with the following 
 |LDZ_MATCHED|8.715029|0.084478|
 |PROPHET_DIFF_DEMAND|8.125445|0.065073|
 |LDZ_STACK|6.471591|0.054500|
+|WEIGHTED_GLM_CWV_WD|4.751675|0.041862|
 
 
 ## Contributing
