@@ -11,6 +11,7 @@ from src.train import (
     train_ldz_diff,
     get_ldz_match_predictions,
     train_ldz_stack_model,
+    train_weighted_ldz_wd_model
 )
 from src.evaluate import evaluate_models
 
@@ -50,12 +51,20 @@ joblib.dump(
     ldz_stack_model, f"data/ldz_stack_model_{dt.now().strftime(format=FORMAT)}.joblib"
 )
 
+weighted_ldz_model, weighted_ldz_cv_predictions = train_weighted_ldz_wd_model(
+    ldz_demand_actuals, gas_features
+)
+joblib.dump(
+    weighted_ldz_model, f"data/weighted_ldz_model_{dt.now().strftime(format=FORMAT)}.joblib"
+)
+
 all_predictions = pd.concat(
     [
         ldz_cv_predictions,
         ldz_diff_cv_predictions,
         ldz_match_predictions,
         ldz_stack_cv_predictions,
+        weighted_ldz_cv_predictions
     ],
     axis=1,
 )

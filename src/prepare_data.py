@@ -47,7 +47,24 @@ def prepare_gas_features(file_paths):
 
     features = add_christmas_bank_holiday(features)
 
+    features = add_weekend_indicator(features)
+
     return features
+
+
+def add_weekend_indicator(input_data):
+    """Add an 0/1 column indicating whether a date falls in the weekend or not
+
+    Args:
+        input_data (pd.DataFrame): A Dataframe with dates on the index
+
+    Returns:
+        pd.DataFrame: Dataframe with an additional WEEKEND column
+    """
+    input_data["WEEKEND"] = (
+        input_data.index.to_series().dt.dayofweek.isin([5, 6]).astype("int")
+    )
+    return input_data
 
 
 def add_christmas_bank_holiday(input_data):

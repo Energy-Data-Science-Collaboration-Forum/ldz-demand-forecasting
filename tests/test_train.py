@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from numpy.testing import assert_array_equal
 from pandas.testing import assert_series_equal, assert_frame_equal
 
 import src.train
@@ -10,6 +11,7 @@ from src.train import (
     add_average_demand_by_month_day,
     train_glm,
     train_ldz_stack_model,
+    exp_decay_sample_weights
 )
 
 
@@ -436,3 +438,33 @@ def test_train_ldz_stack_model():
     )
 
     assert_series_equal(result, desired_result)
+
+
+
+def test_exp_decay_sample_weights():
+    training_data = pd.DataFrame(
+        {
+            "Y": [10, 12, 10, 40, 2, 4, 5, 6, 10, 3],
+            "X": [11, 13, 14, 30, 1, 2, 3, 12, 5, 2],
+        },
+        index=pd.date_range("2020-01-11", "2020-01-20"),
+    )
+
+    result = exp_decay_sample_weights(training_data, alpha=0.8)
+
+    desired_result = np.array(
+        [
+            0.13421772800000006,
+            0.1677721600000001,
+            0.20971520000000007,
+            0.2621440000000001,
+            0.3276800000000001,
+            0.4096000000000001,
+            0.5120000000000001,
+            0.6400000000000001,
+            0.8,
+            1.0,
+        ]
+    )
+
+    assert_array_equal(result.round(4), desired_result.round(4))

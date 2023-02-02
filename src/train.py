@@ -38,7 +38,7 @@ def train_glm(target, features):
     return model, predictions
 
 
-def tss_cross_val_predict(X, y, model, min_train=7):
+def tss_cross_val_predict(X, y, model, min_train=7, weighted=False):
     """Apply a form of Time Series cross validation with the given data and for the given model
     We expand the data by a week in each fold and retrain the model to generate predictions for the next week.
 
@@ -47,6 +47,7 @@ def tss_cross_val_predict(X, y, model, min_train=7):
         y (pandas DataFrame): A DataFrame with the target
         model (a sklearn Model): A model object with a fit and predict function
         min_train (int, optional): Number of historical values necessary to start the training cadence. Defaults to 7.
+        weighted (boolean, optional): Whether or not to weight the observations using an exponential decay scheme. Defaults to False.
 
     Returns:
         pandas Series: A Series with the predictions from all the folds
@@ -64,7 +65,11 @@ def tss_cross_val_predict(X, y, model, min_train=7):
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         y_train = y.iloc[train_index]
 
-        model.fit(X_train, y_train)
+        if weighted:
+            sample_weights = exp_decay_sample_weights(X_train, alpha=0.943)
+            model.fit(X_train, y_train, sample_weights)
+        else:
+            model.fit(X_train, y_train)
 
         test_predictions.append(model.predict(X_test))
 
@@ -343,3 +348,39 @@ def check_overlapping_dates(dataset_one, dataset_two):
     d2 = dataset_two.loc[overlapping_dates].copy()
 
     return d2, d1
+
+
+def exp_decay_sample_weights(df, alpha=0.943):
+    """
+    Exponentially decay sample weights for time series data on a reversed order.
+
+    Args:
+        feature_data (pandas.DataFrame): DataFrame in an ascending order by date
+
+    Returns:
+        numpy.ndarray: Numpy array with sample weights
+    """
+    df = df.copy()
+    df = df.sort_index(ascending=True)
+    df = df.reset_index()
+    df['sample_weight'] = alpha ** df.index[::-1]
+    return df.sample_weight.values
+
+
+def train_weighted_ldz_wd_model(target, features):
+
+    logger.info("Training weighted linear model with CWV and Weekend feature")
+    X = features[["CWV", "WEEKEND"]].dropna()
+
+    X, y = check_overlapping_dates(target, X)
+
+    model = LinearRegression()
+
+    predictions = tss_cross_val_predict(X, y, model, weighted=True)
+    predictions.name = "WEIGHTED_GLM_CWV_WD"
+
+    model = LinearRegression()
+    sample_weights = exp_decay_sample_weights(X, alpha=0.943)
+    model.fit(X, y, sample_weights)
+
+    return model, predictions
