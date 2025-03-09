@@ -3,7 +3,7 @@ pandas==1.5.2
 scikit-learn==1.1.2
 beautifulsoup4==4.11.1
 zeep==4.1.0
-prophet==1.0.1
+prophet===1.1.4
 workalendar==17.0.0
 black
 pep8
