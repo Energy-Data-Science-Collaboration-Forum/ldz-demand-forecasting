@@ -11,7 +11,7 @@ from src.train import (
     add_average_demand_by_month_day,
     train_glm,
     train_ldz_stack_model,
-    exp_decay_sample_weights
+    exp_decay_sample_weights,
 )
 
 
@@ -213,7 +213,6 @@ def test_train_ldz_diff():
 
 
 def test_get_ldz_match_predictions_basic():
-
     dates = pd.date_range("2023-01-29", periods=40, freq="D")
 
     mock_target = pd.DataFrame(
@@ -246,7 +245,6 @@ def test_get_ldz_match_predictions_basic():
 
 
 def test_get_ldz_match_predictions_with_averages(monkeypatch):
-
     dates = pd.date_range("2023-01-29", periods=40, freq="D")
 
     mock_target = pd.DataFrame(
@@ -438,7 +436,6 @@ def test_train_ldz_stack_model():
     )
 
     assert_series_equal(result, desired_result)
-
 
 
 def test_exp_decay_sample_weights():

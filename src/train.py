@@ -34,7 +34,7 @@ def train_glm(target, features):
 
     model = LinearRegression()
     model.fit(X, y)
-    
+
     return model, predictions
 
 
@@ -58,7 +58,6 @@ def tss_cross_val_predict(X, y, model, min_train=7, weighted=False):
     tscv = TimeSeriesSplit(n_splits=nsplits)
 
     for train_index, test_index in tscv.split(X):
-
         if len(train_index) < min_train:
             continue
 
@@ -363,12 +362,11 @@ def exp_decay_sample_weights(df, alpha=0.943):
     df = df.copy()
     df = df.sort_index(ascending=True)
     df = df.reset_index()
-    df['sample_weight'] = alpha ** df.index[::-1]
+    df["sample_weight"] = alpha ** df.index[::-1]
     return df.sample_weight.values
 
 
 def train_weighted_ldz_wd_model(target, features):
-
     logger.info("Training weighted linear model with CWV and Weekend feature")
     X = features[["CWV", "WEEKEND"]].dropna()
 

@@ -10,7 +10,7 @@ from src.prepare_data import (
     prepare_cwv_diff,
     add_workday,
     add_christmas_bank_holiday,
-    add_weekend_indicator
+    add_weekend_indicator,
 )
 
 
@@ -91,7 +91,6 @@ def test_prepare_cwv(monkeypatch):
 
 
 def test_prepare_gas_demand_diff(monkeypatch):
-
     mock_data = pd.DataFrame(
         {
             "INDUSTRIAL": [1.0] * 4,
@@ -121,7 +120,6 @@ def test_prepare_gas_demand_diff(monkeypatch):
 
 
 def test_prepare_cwv_diff(monkeypatch):
-
     mock_data = pd.DataFrame(
         {"CWV": [1.0, 2, 4, 10]},
         index=pd.DatetimeIndex(
@@ -156,6 +154,7 @@ def test_add_workday():
 
     assert_frame_equal(result, desired_result)
 
+
 def test_add_christmas_bank_holiday():
     mock_data = pd.DataFrame(
         {"One": [1] * 10}, index=pd.date_range("2022-12-24", periods=10, freq="D")
@@ -167,8 +166,8 @@ def test_add_christmas_bank_holiday():
     desired_result["CHRISTMAS_DAY"] = [0, 1] + [0] * 8
     desired_result["NEW_YEARS_DAY"] = [0] * 8 + [1, 0]
     desired_result["NEW_YEARS_EVE"] = [0] * 7 + [1, 0, 0]
-    desired_result["BOXING_DAY"] = [0, 0, 1] + [0] * 7   
-        
+    desired_result["BOXING_DAY"] = [0, 0, 1] + [0] * 7
+
     assert_frame_equal(result, desired_result)
 
 

@@ -74,23 +74,23 @@ def add_christmas_bank_holiday(input_data):
         input_data (pandas DataFrame): A DataFrame with dates on the index
 
     Returns:
-        pandas DataFrame: A DataFrame with an additional CHRISTMAS_DAY, NEW_YEARS_DAY, NEW_YEARS_EVE 
+        pandas DataFrame: A DataFrame with an additional CHRISTMAS_DAY, NEW_YEARS_DAY, NEW_YEARS_EVE
         and BOXING_DAY column. Values are 0 (= no bank holiday) and 1 (= bank holiday) values
     """
     result = input_data.copy()
 
     result["M"] = result.index.month
     result["D"] = result.index.day
-    result["CHRISTMAS_DAY"] = result["NEW_YEARS_DAY"] = result["NEW_YEARS_EVE"] = result[
-        "BOXING_DAY"
-    ] = 0
+    result["CHRISTMAS_DAY"] = result["NEW_YEARS_DAY"] = result[
+        "NEW_YEARS_EVE"
+    ] = result["BOXING_DAY"] = 0
     result.loc[(result["M"] == 12) & (result["D"] == 25), "CHRISTMAS_DAY"] = 1
     result.loc[(result["M"] == 1) & (result["D"] == 1), "NEW_YEARS_DAY"] = 1
     result.loc[(result["M"] == 12) & (result["D"] == 31), "NEW_YEARS_EVE"] = 1
     result.loc[(result["M"] == 12) & (result["D"] == 26), "BOXING_DAY"] = 1
 
     result = result.drop(columns=["M", "D"])
-    
+
     return result
 
 
@@ -107,7 +107,9 @@ def add_workday(input_data):
     result = input_data.copy()
 
     cal = UnitedKingdom()
-    result["WORK_DAY"] = result.index.to_series().apply(lambda x: 1 if cal.is_working_day(x) else 0)
+    result["WORK_DAY"] = result.index.to_series().apply(
+        lambda x: 1 if cal.is_working_day(x) else 0
+    )
 
     return result
 
