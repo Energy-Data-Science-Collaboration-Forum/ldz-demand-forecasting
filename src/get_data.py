@@ -50,7 +50,7 @@ def get_cwv_from_mipi(output_dir, from_date, to_date):
         if len(data) > 0:
             cwvs_list.append(data)
     
-    if len(cwvs) > 0:
+    if len(cwvs_list) > 0:
         cwvs = pd.concat(cwvs_list)
         cwvs["LDZ"] = cwvs["PublicationName"].str.slice(-8, -6)
         df = cwvs.drop(columns="PublicationName")
