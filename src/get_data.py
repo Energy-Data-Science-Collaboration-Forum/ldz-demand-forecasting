@@ -43,9 +43,15 @@ def get_cwv_from_mipi(output_dir, from_date, to_date):
         from_date (str): Lower bound for the applicable date of the dataset, yyyy-mm-dd format
         to_date (str): Upper bound for the applicable date of the dataset, yyyy-mm-dd format
     """
-    cwvs = get_mipi_data(CWV_DATA_ITEMS, from_date, to_date)
-
+    cwvs_list = []
+    # Have to get the data for each LDZ separately as the requested data is more than the allowed threshold
+    for item in CWV_DATA_ITEMS:
+        data = get_mipi_data([item], from_date, to_date)
+        if len(data) > 0:
+            cwvs_list.append(data)
+    
     if len(cwvs) > 0:
+        cwvs = pd.concat(cwvs_list)
         cwvs["LDZ"] = cwvs["PublicationName"].str.slice(-8, -6)
         df = cwvs.drop(columns="PublicationName")
         df.to_csv(
