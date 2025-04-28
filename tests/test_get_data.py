@@ -1,6 +1,4 @@
-import logging
 import pandas as pd
-from pandas.testing import assert_frame_equal
 import src.get_data
 from src.get_data import get_cwv_from_mipi, get_gas_actuals_from_mipi
 
