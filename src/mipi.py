@@ -1,5 +1,8 @@
 import pandas as pd
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 MIPI_CATALOG_URL = (
     "https://api.nationalgas.com/operationaldata/v1/publications/catalogue"
@@ -61,6 +64,10 @@ def get_mipi_catalogue_items() -> pd.DataFrame:
         JSONDecodeError: If the API response cannot be parsed as JSON
     """
     response = requests.get(MIPI_CATALOG_URL)
+    if response.status_code != 200:
+        logger.error(f"API request failed with status code {response.status_code}. Error: {response.text}")
+        return pd.DataFrame()
+    
     catalogue = response.json()["data"]
     items = []
     for category in catalogue:
@@ -94,8 +101,12 @@ def get_mipi_data(names: list, from_date: str, to_date: str) -> pd.DataFrame:
     }
 
     response = requests.post(MIPI_DATA_URL, json=payload)
-    data = response.json()
+    
+    if response.status_code != 200:
+        logger.error(f"API request failed with status code {response.status_code}. Error: {response.text}")
+        return pd.DataFrame()
 
+    data = response.json()
     # Extract publications data and create DataFrame
     result = []
     for item in data:
