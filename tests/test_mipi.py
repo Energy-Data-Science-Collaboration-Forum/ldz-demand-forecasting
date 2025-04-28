@@ -1,3 +1,6 @@
+import requests
+import pandas as pd
+from pandas.testing import assert_frame_equal
 from src.mipi import process_subcategories, get_mipi_catalogue_items
 
 
@@ -43,3 +46,57 @@ def test_process_subcategories_nested_structure():
         "category": "SubCategory",
         "subcategory": "SubCategory",
     }
+
+
+def test_get_mipi_catalogue_items(monkeypatch):
+    mock_response = {
+        "data": [
+            {
+                "name": "Category1",
+                "catalogueEntries": [
+                    {"name": "Entry1", "publicationId": "pub1"}
+                ]
+            },
+            {
+                "name": "Category2",
+                "subCategory": [
+                    {
+                        "name": "SubCat",
+                        "catalogueEntries": [
+                            {"name": "Entry2", "publicationId": "pub2"}
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+
+        def json(self):
+            return mock_response
+
+    def mock_get(*args, **kwargs):
+        return MockResponse()
+
+    monkeypatch.setattr(requests, "get", mock_get)
+
+    result = get_mipi_catalogue_items()
+    expected_df = pd.DataFrame([
+        {
+            "name": "Entry1",
+            "publicationId": "pub1",
+            "category": "Category1",
+            "subcategory": ""
+        },
+        {
+            "name": "Entry2",
+            "publicationId": "pub2",
+            "category": "SubCat",
+            "subcategory": "SubCat"
+        }
+    ])
+    
+    assert_frame_equal(result, expected_df)
