@@ -53,7 +53,7 @@ def get_cwv_from_mipi(output_dir, from_date, to_date):
             index=False,
         )
     else:
-        logger.warning(f"No CWV Data Available")
+        logger.warning("No CWV Data Available")
 
 
 def get_gas_actuals_from_mipi(output_dir, from_date, to_date):
@@ -76,7 +76,7 @@ def get_gas_actuals_from_mipi(output_dir, from_date, to_date):
             index=False,
         )
     else:
-        logger.warn("No Actuals Data Returned")
+        logger.warning("No Actuals Data Returned")
 
 
 if __name__ == "__main__":
